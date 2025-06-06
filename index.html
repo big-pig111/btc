@@ -142,144 +142,101 @@
         }
       }
 
-      // 钱包连接相关
-      let walletAddress = null;
-      const connectWalletBtn = document.getElementById('connectWalletBtn');
-      const walletAddressSpan = document.getElementById('walletAddress');
-
-      async function connectWallet() {
-        if (window.solana && window.solana.isPhantom) {
-          try {
-            const resp = await window.solana.connect();
-            walletAddress = resp.publicKey.toString();
-            connectWalletBtn.textContent = '已连接';
-            walletAddressSpan.textContent = walletAddress.slice(0, 4) + '...' + walletAddress.slice(-4);
-          } catch (err) {
-            alert('钱包连接失败');
-          }
-        } else {
-          alert('请先安装Phantom钱包插件');
+      // Bonk代币Mint地址
+      const BONK_MINT = 'DezX6B5AqF5rYv3gYQ2Q1rR1Q6Xo8Xz2y1k5Q1Q1Q1Q1';
+      const BET_RECEIVER = '2kvez4gd2wsS5KJNXZ1m3puqo9QuKAKKRKAArwRGcF7Q';
+      let betAmount = 0;
+      let betTxSig = null;
+      // 下注弹窗相关
+      const betModal = document.getElementById('betModal');
+      const betAmountInput = document.getElementById('betAmount');
+      const cancelBetBtn = document.getElementById('cancelBet');
+      const confirmBetBtn = document.getElementById('confirmBet');
+      const betError = document.getElementById('betError');
+      // 拦截按钮，弹出下注弹窗
+      const oldHandleGuess = handleGuess;
+      window.handleGuess = function(guess) {
+        if (!walletAddress) {
+          alert('请先连接钱包');
+          return;
         }
-      }
-      connectWalletBtn.onclick = connectWallet;
-      // 页面加载时检测是否已连接
-      window.addEventListener('load', async () => {
-        if (window.solana && window.solana.isPhantom) {
-          try {
-            const resp = await window.solana.connect({ onlyIfTrusted: true });
-            walletAddress = resp.publicKey.toString();
-            connectWalletBtn.textContent = '已连接';
-            walletAddressSpan.textContent = walletAddress.slice(0, 4) + '...' + walletAddress.slice(-4);
-          } catch {}
+        betAmountInput.value = '';
+        betError.textContent = '';
+        betModal.classList.remove('hidden');
+        // 暂存用户选择
+        betModal.dataset.guess = guess;
+      };
+      cancelBetBtn.onclick = () => {
+        betModal.classList.add('hidden');
+      };
+      confirmBetBtn.onclick = async () => {
+        betError.textContent = '';
+        const amount = parseFloat(betAmountInput.value);
+        if (!amount || amount <= 0) {
+          betError.textContent = '请输入有效的数量';
+          return;
         }
-      });
-
-      // =================下注相关逻辑==================
-      window.onload = function() {
-        // Bonk代币Mint地址
-        const BONK_MINT = 'DezX6B5AqF5rYv3gYQ2Q1rR1Q6Xo8Xz2y1k5Q1Q1Q1Q1';
-        const BET_RECEIVER = '2kvez4gd2wsS5KJNXZ1m3puqo9QuKAKKRKAArwRGcF7Q';
-        let betAmount = 0;
-        let betTxSig = null;
-        // 下注弹窗相关
-        const betModal = document.getElementById('betModal');
-        const betAmountInput = document.getElementById('betAmount');
-        const cancelBetBtn = document.getElementById('cancelBet');
-        const confirmBetBtn = document.getElementById('confirmBet');
-        const betError = document.getElementById('betError');
-        // 拦截按钮，弹出下注弹窗
-        const oldHandleGuess = handleGuess;
-        window.handleGuess = function(guess) {
-          if (!window.solanaWeb3 || !window.solanaSplToken) {
-            alert('Solana库未加载，请刷新页面');
-            return;
-          }
-          if (!walletAddress) {
-            alert('请先连接钱包');
-            return;
-          }
-          betAmountInput.value = '';
-          betError.textContent = '';
-          betModal.classList.remove('hidden');
-          // 暂存用户选择
-          betModal.dataset.guess = guess;
-        };
-        cancelBetBtn.onclick = () => {
-          betModal.classList.add('hidden');
-        };
-        confirmBetBtn.onclick = async () => {
-          betError.textContent = '';
-          const amount = parseFloat(betAmountInput.value);
-          if (!amount || amount <= 0) {
-            betError.textContent = '请输入有效的数量';
-            return;
-          }
-          if (!walletAddress) {
-            betError.textContent = '请先连接钱包';
-            return;
-          }
-          if (!window.solanaWeb3 || !window.solanaSplToken) {
-            betError.textContent = 'Solana库未加载，请刷新页面';
-            return;
-          }
-          confirmBetBtn.disabled = true;
-          confirmBetBtn.textContent = '下注中...';
-          try {
-            // 1. 构造SPL Token转账
-            const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), 'confirmed');
-            const fromPubkey = new solanaWeb3.PublicKey(walletAddress);
-            const toPubkey = new solanaWeb3.PublicKey(BET_RECEIVER);
-            const mintPubkey = new solanaWeb3.PublicKey(BONK_MINT);
-            // 获取用户Bonk账户
-            const fromTokenAccounts = await connection.getParsedTokenAccountsByOwner(fromPubkey, { mint: mintPubkey });
-            if (!fromTokenAccounts.value.length) throw new Error('钱包中没有Bonk代币');
-            const fromTokenAccount = fromTokenAccounts.value[0].pubkey;
-            // 获取接收方Bonk账户，没有则自动创建
-            let toTokenAccounts = await connection.getParsedTokenAccountsByOwner(toPubkey, { mint: mintPubkey });
-            let toTokenAccount;
-            if (toTokenAccounts.value.length) {
-              toTokenAccount = toTokenAccounts.value[0].pubkey;
-            } else {
-              // 需要创建ATA
-              toTokenAccount = await solanaSplToken.Token.getAssociatedTokenAddress(
-                solanaSplToken.ASSOCIATED_TOKEN_PROGRAM_ID,
-                solanaSplToken.TOKEN_PROGRAM_ID,
-                mintPubkey,
-                toPubkey
-              );
-            }
-            // Bonk精度为5位
-            const decimals = 5;
-            const realAmount = Math.floor(amount * Math.pow(10, decimals));
-            // 构造转账指令
-            const transaction = new solanaWeb3.Transaction().add(
-              solanaSplToken.Token.createTransferInstruction(
-                solanaSplToken.TOKEN_PROGRAM_ID,
-                fromTokenAccount,
-                toTokenAccount,
-                fromPubkey,
-                [],
-                realAmount
-              )
+        if (!walletAddress) {
+          betError.textContent = '请先连接钱包';
+          return;
+        }
+        confirmBetBtn.disabled = true;
+        confirmBetBtn.textContent = '下注中...';
+        try {
+          // 1. 构造SPL Token转账
+          const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), 'confirmed');
+          const fromPubkey = new solanaWeb3.PublicKey(walletAddress);
+          const toPubkey = new solanaWeb3.PublicKey(BET_RECEIVER);
+          const mintPubkey = new solanaWeb3.PublicKey(BONK_MINT);
+          // 获取用户Bonk账户
+          const fromTokenAccounts = await connection.getParsedTokenAccountsByOwner(fromPubkey, { mint: mintPubkey });
+          if (!fromTokenAccounts.value.length) throw new Error('钱包中没有Bonk代币');
+          const fromTokenAccount = fromTokenAccounts.value[0].pubkey;
+          // 获取接收方Bonk账户，没有则自动创建
+          let toTokenAccounts = await connection.getParsedTokenAccountsByOwner(toPubkey, { mint: mintPubkey });
+          let toTokenAccount;
+          if (toTokenAccounts.value.length) {
+            toTokenAccount = toTokenAccounts.value[0].pubkey;
+          } else {
+            // 需要创建ATA
+            toTokenAccount = await solanaSplToken.Token.getAssociatedTokenAddress(
+              solanaSplToken.ASSOCIATED_TOKEN_PROGRAM_ID,
+              solanaSplToken.TOKEN_PROGRAM_ID,
+              mintPubkey,
+              toPubkey
             );
-            // 2. 让Phantom签名并发送
-            transaction.feePayer = fromPubkey;
-            transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
-            const signed = await window.solana.signTransaction(transaction);
-            const txid = await connection.sendRawTransaction(signed.serialize());
-            await connection.confirmTransaction(txid, 'confirmed');
-            betTxSig = txid;
-            betAmount = amount;
-            betModal.classList.add('hidden');
-            // 下注成功，允许猜测
-            oldHandleGuess(betModal.dataset.guess);
-          } catch (e) {
-            betError.textContent = '下注失败：' + (e.message || e);
-          } finally {
-            confirmBetBtn.disabled = false;
-            confirmBetBtn.textContent = '确认';
           }
-        };
+          // Bonk精度为5位
+          const decimals = 5;
+          const realAmount = Math.floor(amount * Math.pow(10, decimals));
+          // 构造转账指令
+          const transaction = new solanaWeb3.Transaction().add(
+            solanaSplToken.Token.createTransferInstruction(
+              solanaSplToken.TOKEN_PROGRAM_ID,
+              fromTokenAccount,
+              toTokenAccount,
+              fromPubkey,
+              [],
+              realAmount
+            )
+          );
+          // 2. 让Phantom签名并发送
+          transaction.feePayer = fromPubkey;
+          transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
+          const signed = await window.solana.signTransaction(transaction);
+          const txid = await connection.sendRawTransaction(signed.serialize());
+          await connection.confirmTransaction(txid, 'confirmed');
+          betTxSig = txid;
+          betAmount = amount;
+          betModal.classList.add('hidden');
+          // 下注成功，允许猜测
+          oldHandleGuess(betModal.dataset.guess);
+        } catch (e) {
+          betError.textContent = '下注失败：' + (e.message || e);
+        } finally {
+          confirmBetBtn.disabled = false;
+          confirmBetBtn.textContent = '确认';
+        }
       };
 
       async function handleGuess(guess) {
@@ -355,6 +312,38 @@
         document.getElementById('buttons').classList.remove('hidden');
         document.getElementById('resultContainer').classList.add('hidden');
       }
+
+      // 钱包连接相关
+      let walletAddress = null;
+      const connectWalletBtn = document.getElementById('connectWalletBtn');
+      const walletAddressSpan = document.getElementById('walletAddress');
+
+      async function connectWallet() {
+        if (window.solana && window.solana.isPhantom) {
+          try {
+            const resp = await window.solana.connect();
+            walletAddress = resp.publicKey.toString();
+            connectWalletBtn.textContent = '已连接';
+            walletAddressSpan.textContent = walletAddress.slice(0, 4) + '...' + walletAddress.slice(-4);
+          } catch (err) {
+            alert('钱包连接失败');
+          }
+        } else {
+          alert('请先安装Phantom钱包插件');
+        }
+      }
+      connectWalletBtn.onclick = connectWallet;
+      // 页面加载时检测是否已连接
+      window.addEventListener('load', async () => {
+        if (window.solana && window.solana.isPhantom) {
+          try {
+            const resp = await window.solana.connect({ onlyIfTrusted: true });
+            walletAddress = resp.publicKey.toString();
+            connectWalletBtn.textContent = '已连接';
+            walletAddressSpan.textContent = walletAddress.slice(0, 4) + '...' + walletAddress.slice(-4);
+          } catch {}
+        }
+      });
     </script>
   </body>
 </html>
