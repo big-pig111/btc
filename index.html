@@ -149,43 +149,23 @@
       const BET_RECEIVER = '2kvez4gd2wsS5KJNXZ1m3puqo9QuKAKKRKAArwRGcF7Q';
       let betAmount = 0;
       let betTxSig = null;
+      
       // 下注弹窗相关
       const betModal = document.getElementById('betModal');
       const cancelBetBtn = document.getElementById('cancelBet');
       const betOptionBtns = Array.from(document.querySelectorAll('.betOption'));
       const betError = document.getElementById('betError');
-      // 拦截按钮，弹出下注弹窗
-      const oldHandleGuess = handleGuess;
-      window.handleGuess = function(guess) {
+      
+      // 修改后的handleGuess函数，直接调用钱包转账
+      async function handleGuess(guess) {
         if (!walletAddress) {
           alert('请先连接钱包');
           return;
         }
-        betModal.classList.remove('hidden');
-        // 暂存用户选择
-        betModal.dataset.guess = guess;
-      };
-      cancelBetBtn.onclick = () => {
-        betModal.classList.add('hidden');
-      };
-      // 绑定固定挡位下注按钮
-      betOptionBtns.forEach(btn => {
-        btn.onclick = () => {
-          const amount = parseInt(btn.dataset.amount, 10);
-          placeBet(amount);
-        };
-      });
-
-      // 初始化 Solana Web3（已通过本地文件加载）
-      const solanaWeb3 = window.solanaWeb3;
-      const solanaSplToken = window.solanaSplToken;
-
-      async function placeBet(amount) {
-        betError.textContent = '';
-        if (!walletAddress) {
-          betError.textContent = '请先连接钱包';
-          return;
-        }
+        
+        // 直接设置下注金额为100,000 BONK
+        const amount = 100000;
+        
         try {
           // 1. 构造 SPL Token 转账 Transaction
           const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), 'confirmed');
@@ -237,15 +217,16 @@
 
           betTxSig = signed.signature;
           betAmount = amount;
-          betModal.classList.add('hidden');
-          // 下注成功，开始游戏
-          oldHandleGuess(betModal.dataset.guess);
+          
+          // 下注成功后开始游戏
+          startGame(guess);
         } catch (e) {
-          betError.textContent = '下注失败：' + (e.message || e);
+          alert('下注失败：' + (e.message || e));
+          return;
         }
       }
-
-      async function handleGuess(guess) {
+      
+      async function startGame(guess) {
         prediction = guess;
         document.getElementById('buttons').classList.add('hidden');
         document.getElementById('countdown').classList.remove('hidden');
@@ -350,6 +331,10 @@
           } catch {}
         }
       });
+      
+      function getRandomMeme() {
+        return memes[Math.floor(Math.random() * memes.length)];
+      }
     </script>
   </body>
 </html>
