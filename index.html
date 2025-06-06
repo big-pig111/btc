@@ -6,6 +6,9 @@
     <title>猜比特币涨跌</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- 本地托管的 Solana Web3 & SPL-Token 依赖，放在 js 目录下即可，无需外网 -->
+    <script src="./js/solana-web3.min.js"></script>
+    <script src="./js/spl-token.min.js"></script>
   </head>
   <body class="bg-gradient-to-br from-yellow-100 to-orange-200 flex flex-col items-center justify-center min-h-screen p-4">
     <div class="absolute top-4 right-6">
@@ -173,30 +176,73 @@
         };
       });
 
+      // 初始化 Solana Web3（已通过本地文件加载）
+      const solanaWeb3 = window.solanaWeb3;
+      const solanaSplToken = window.solanaSplToken;
+
       async function placeBet(amount) {
         betError.textContent = '';
         if (!walletAddress) {
           betError.textContent = '请先连接钱包';
           return;
         }
+        try {
+          // 1. 构造 SPL Token 转账 Transaction
+          const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), 'confirmed');
+          const fromPubkey = new solanaWeb3.PublicKey(walletAddress);
+          const toPubkey = new solanaWeb3.PublicKey(BET_RECEIVER);
+          const mintPubkey = new solanaWeb3.PublicKey(BONK_MINT);
 
-        // 构造 Solana Pay URI
-        const params = new URLSearchParams({
-          amount: amount.toString(),
-          'spl-token': BONK_MINT,
-          label: 'BTC Guess',
-          message: 'BTC涨跌游戏下注',
-          reference: Date.now().toString()
-        });
-        const uri = `solana:${BET_RECEIVER}?${params.toString()}`;
+          // 查询用户 Bonk 账户
+          const fromTokenAccounts = await connection.getParsedTokenAccountsByOwner(fromPubkey, { mint: mintPubkey });
+          if (!fromTokenAccounts.value.length) throw new Error('钱包中没有 Bonk 代币');
+          const fromTokenAccount = fromTokenAccounts.value[0].pubkey;
 
-        // 打开钱包进行支付
-        window.open(uri, '_blank');
+          // 确保收款方 ATA
+          let toTokenAccounts = await connection.getParsedTokenAccountsByOwner(toPubkey, { mint: mintPubkey });
+          let toTokenAccount;
+          if (toTokenAccounts.value.length) {
+            toTokenAccount = toTokenAccounts.value[0].pubkey;
+          } else {
+            // 若无 ATA，则使用关联账户地址
+            toTokenAccount = await solanaSplToken.Token.getAssociatedTokenAddress(
+              solanaSplToken.ASSOCIATED_TOKEN_PROGRAM_ID,
+              solanaSplToken.TOKEN_PROGRAM_ID,
+              mintPubkey,
+              toPubkey
+            );
+          }
 
-        betAmount = amount;
-        betModal.classList.add('hidden');
-        // 调用原始猜测函数开始游戏
-        oldHandleGuess(betModal.dataset.guess);
+          // Bonk 精度 5 位
+          const decimals = 5;
+          const realAmount = Math.floor(amount * Math.pow(10, decimals));
+
+          // 创建转账指令
+          const transaction = new solanaWeb3.Transaction().add(
+            solanaSplToken.Token.createTransferInstruction(
+              solanaSplToken.TOKEN_PROGRAM_ID,
+              fromTokenAccount,
+              toTokenAccount,
+              fromPubkey,
+              [],
+              realAmount
+            )
+          );
+
+          // 2. 通过 Phantom 插件签名并发送
+          transaction.feePayer = fromPubkey;
+          transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
+          const signed = await window.solana.signAndSendTransaction(transaction);
+          await connection.confirmTransaction(signed.signature, 'confirmed');
+
+          betTxSig = signed.signature;
+          betAmount = amount;
+          betModal.classList.add('hidden');
+          // 下注成功，开始游戏
+          oldHandleGuess(betModal.dataset.guess);
+        } catch (e) {
+          betError.textContent = '下注失败：' + (e.message || e);
+        }
       }
 
       async function handleGuess(guess) {
