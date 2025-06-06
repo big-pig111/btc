@@ -51,8 +51,14 @@
     </div>
 
     <script>
-      const solanaWeb3 = window.solanaWeb3 || (window.solana && window.solana.web3);
+      const solanaWeb3 = window.solanaWeb3 || window.web3 || (window.solana && window.solana.web3);
       const solanaSplToken = window.solanaSplToken;
+      console.log('solanaWeb3:', solanaWeb3);
+      if (!solanaWeb3) {
+        console.error('未检测到 solanaWeb3，请检查 CDN 是否加载成功以及全局变量名。');
+      } else if (!solanaWeb3.Connection) {
+        console.error('solanaWeb3 加载成功，但没有 Connection 属性，请检查全局变量名是否正确。');
+      }
 
       let prediction = null;
       let countdown = 10;
