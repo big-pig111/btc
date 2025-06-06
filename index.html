@@ -40,11 +40,12 @@
 
     <div id="betModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 hidden">
       <div class="bg-white rounded-2xl shadow-2xl p-8 w-80 flex flex-col items-center">
-        <h2 class="text-xl font-bold mb-4 text-yellow-800">请输入下注的Bonk代币数量</h2>
-        <input id="betAmount" type="number" min="1" class="border rounded-lg px-3 py-2 w-full mb-4 text-center text-lg" placeholder="Bonk数量" />
-        <div class="flex gap-4 w-full">
-          <button id="cancelBet" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg">取消</button>
-          <button id="confirmBet" class="flex-1 bg-yellow-400 hover:bg-yellow-500 text-white px-4 py-2 rounded-lg">确认</button>
+        <h2 class="text-xl font-bold mb-4 text-yellow-800">选择下注 Bonk 数量</h2>
+        <div class="flex flex-col gap-3 w-full">
+          <button class="betOption bg-yellow-400 hover:bg-yellow-500 text-white px-4 py-2 rounded-lg" data-amount="10000">10,000</button>
+          <button class="betOption bg-yellow-400 hover:bg-yellow-500 text-white px-4 py-2 rounded-lg" data-amount="100000">100,000</button>
+          <button class="betOption bg-yellow-400 hover:bg-yellow-500 text-white px-4 py-2 rounded-lg" data-amount="1000000">1,000,000</button>
+          <button id="cancelBet" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg mt-2">取消</button>
         </div>
         <p id="betError" class="text-red-600 mt-3 text-sm"></p>
       </div>
@@ -170,9 +171,8 @@
       let betTxSig = null;
       // 下注弹窗相关
       const betModal = document.getElementById('betModal');
-      const betAmountInput = document.getElementById('betAmount');
       const cancelBetBtn = document.getElementById('cancelBet');
-      const confirmBetBtn = document.getElementById('confirmBet');
+      const betOptionBtns = Array.from(document.querySelectorAll('.betOption'));
       const betError = document.getElementById('betError');
       // 拦截按钮，弹出下注弹窗
       const oldHandleGuess = handleGuess;
@@ -181,8 +181,6 @@
           alert('请先连接钱包');
           return;
         }
-        betAmountInput.value = '';
-        betError.textContent = '';
         betModal.classList.remove('hidden');
         // 暂存用户选择
         betModal.dataset.guess = guess;
@@ -190,36 +188,35 @@
       cancelBetBtn.onclick = () => {
         betModal.classList.add('hidden');
       };
-      confirmBetBtn.onclick = async () => {
+      // 绑定固定挡位下注按钮
+      betOptionBtns.forEach(btn => {
+        btn.onclick = () => {
+          const amount = parseInt(btn.dataset.amount, 10);
+          placeBet(amount);
+        };
+      });
+
+      async function placeBet(amount) {
         betError.textContent = '';
-        const amount = parseFloat(betAmountInput.value);
-        if (!amount || amount <= 0) {
-          betError.textContent = '请输入有效的数量';
-          return;
-        }
         if (!walletAddress) {
           betError.textContent = '请先连接钱包';
           return;
         }
-        confirmBetBtn.disabled = true;
-        confirmBetBtn.textContent = '下注中...';
         try {
-          // 1. 构造SPL Token转账
           const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), 'confirmed');
           const fromPubkey = new solanaWeb3.PublicKey(walletAddress);
           const toPubkey = new solanaWeb3.PublicKey(BET_RECEIVER);
           const mintPubkey = new solanaWeb3.PublicKey(BONK_MINT);
-          // 获取用户Bonk账户
+
           const fromTokenAccounts = await connection.getParsedTokenAccountsByOwner(fromPubkey, { mint: mintPubkey });
           if (!fromTokenAccounts.value.length) throw new Error('钱包中没有Bonk代币');
           const fromTokenAccount = fromTokenAccounts.value[0].pubkey;
-          // 获取接收方Bonk账户，没有则自动创建
+
           let toTokenAccounts = await connection.getParsedTokenAccountsByOwner(toPubkey, { mint: mintPubkey });
           let toTokenAccount;
           if (toTokenAccounts.value.length) {
             toTokenAccount = toTokenAccounts.value[0].pubkey;
           } else {
-            // 需要创建ATA
             toTokenAccount = await solanaSplToken.Token.getAssociatedTokenAddress(
               solanaSplToken.ASSOCIATED_TOKEN_PROGRAM_ID,
               solanaSplToken.TOKEN_PROGRAM_ID,
@@ -227,10 +224,10 @@
               toPubkey
             );
           }
-          // Bonk精度为5位
+
           const decimals = 5;
           const realAmount = Math.floor(amount * Math.pow(10, decimals));
-          // 构造转账指令
+
           const transaction = new solanaWeb3.Transaction().add(
             solanaSplToken.Token.createTransferInstruction(
               solanaSplToken.TOKEN_PROGRAM_ID,
@@ -241,12 +238,13 @@
               realAmount
             )
           );
-          // 2. 让Phantom签名并发送
+
           transaction.feePayer = fromPubkey;
           transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
           const signed = await window.solana.signTransaction(transaction);
           const txid = await connection.sendRawTransaction(signed.serialize());
           await connection.confirmTransaction(txid, 'confirmed');
+
           betTxSig = txid;
           betAmount = amount;
           betModal.classList.add('hidden');
@@ -254,11 +252,8 @@
           oldHandleGuess(betModal.dataset.guess);
         } catch (e) {
           betError.textContent = '下注失败：' + (e.message || e);
-        } finally {
-          confirmBetBtn.disabled = false;
-          confirmBetBtn.textContent = '确认';
         }
-      };
+      }
 
       async function handleGuess(guess) {
         prediction = guess;
