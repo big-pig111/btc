@@ -6,8 +6,6 @@
     <title>猜比特币涨跌</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://fastly.jsdelivr.net/npm/@solana/web3.js@1.93.5/lib/index.iife.min.js"></script>
-    <script src="https://fastly.jsdelivr.net/npm/@solana/spl-token@0.3.8/lib/index.iife.min.js"></script>
   </head>
   <body class="bg-gradient-to-br from-yellow-100 to-orange-200 flex flex-col items-center justify-center min-h-screen p-4">
     <div class="absolute top-4 right-6">
@@ -52,27 +50,6 @@
     </div>
 
     <script>
-      const solanaWeb3 = window.solanaWeb3;
-      if (!solanaWeb3) {
-        // 尝试动态加载 Solana Web3 IIFE，如果首个 CDN 未能加载（如被墙）
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/@solana/web3.js@1.93.5/lib/index.iife.min.js';
-        script.onload = () => {
-          console.log('备用 CDN 已加载 solanaWeb3');
-        };
-        script.onerror = () => {
-          console.error('备用 CDN 加载 solanaWeb3 失败');
-        };
-        document.head.appendChild(script);
-      }
-      const solanaSplToken = window.solanaSplToken;
-      console.log('solanaWeb3:', solanaWeb3);
-      if (!solanaWeb3) {
-        console.error('未检测到 solanaWeb3，请检查 CDN 是否加载成功以及全局变量名。');
-      } else if (!solanaWeb3.Connection) {
-        console.error('solanaWeb3 加载成功，但没有 Connection 属性，请检查全局变量名是否正确。');
-      }
-
       let prediction = null;
       let countdown = 10;
       let timer;
@@ -202,57 +179,24 @@
           betError.textContent = '请先连接钱包';
           return;
         }
-        try {
-          const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), 'confirmed');
-          const fromPubkey = new solanaWeb3.PublicKey(walletAddress);
-          const toPubkey = new solanaWeb3.PublicKey(BET_RECEIVER);
-          const mintPubkey = new solanaWeb3.PublicKey(BONK_MINT);
 
-          const fromTokenAccounts = await connection.getParsedTokenAccountsByOwner(fromPubkey, { mint: mintPubkey });
-          if (!fromTokenAccounts.value.length) throw new Error('钱包中没有Bonk代币');
-          const fromTokenAccount = fromTokenAccounts.value[0].pubkey;
+        // 构造 Solana Pay URI
+        const params = new URLSearchParams({
+          amount: amount.toString(),
+          'spl-token': BONK_MINT,
+          label: 'BTC Guess',
+          message: 'BTC涨跌游戏下注',
+          reference: Date.now().toString()
+        });
+        const uri = `solana:${BET_RECEIVER}?${params.toString()}`;
 
-          let toTokenAccounts = await connection.getParsedTokenAccountsByOwner(toPubkey, { mint: mintPubkey });
-          let toTokenAccount;
-          if (toTokenAccounts.value.length) {
-            toTokenAccount = toTokenAccounts.value[0].pubkey;
-          } else {
-            toTokenAccount = await solanaSplToken.Token.getAssociatedTokenAddress(
-              solanaSplToken.ASSOCIATED_TOKEN_PROGRAM_ID,
-              solanaSplToken.TOKEN_PROGRAM_ID,
-              mintPubkey,
-              toPubkey
-            );
-          }
+        // 打开钱包进行支付
+        window.open(uri, '_blank');
 
-          const decimals = 5;
-          const realAmount = Math.floor(amount * Math.pow(10, decimals));
-
-          const transaction = new solanaWeb3.Transaction().add(
-            solanaSplToken.Token.createTransferInstruction(
-              solanaSplToken.TOKEN_PROGRAM_ID,
-              fromTokenAccount,
-              toTokenAccount,
-              fromPubkey,
-              [],
-              realAmount
-            )
-          );
-
-          transaction.feePayer = fromPubkey;
-          transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
-          const signed = await window.solana.signTransaction(transaction);
-          const txid = await connection.sendRawTransaction(signed.serialize());
-          await connection.confirmTransaction(txid, 'confirmed');
-
-          betTxSig = txid;
-          betAmount = amount;
-          betModal.classList.add('hidden');
-          // 下注成功，允许猜测
-          oldHandleGuess(betModal.dataset.guess);
-        } catch (e) {
-          betError.textContent = '下注失败：' + (e.message || e);
-        }
+        betAmount = amount;
+        betModal.classList.add('hidden');
+        // 调用原始猜测函数开始游戏
+        oldHandleGuess(betModal.dataset.guess);
       }
 
       async function handleGuess(guess) {
