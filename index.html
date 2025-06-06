@@ -52,6 +52,18 @@
 
     <script>
       const solanaWeb3 = window.solanaWeb3;
+      if (!solanaWeb3) {
+        // 尝试动态加载 Solana Web3 IIFE，如果首个 CDN 未能加载（如被墙）
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/@solana/web3.js@1.93.5/lib/index.iife.min.js';
+        script.onload = () => {
+          console.log('备用 CDN 已加载 solanaWeb3');
+        };
+        script.onerror = () => {
+          console.error('备用 CDN 加载 solanaWeb3 失败');
+        };
+        document.head.appendChild(script);
+      }
       const solanaSplToken = window.solanaSplToken;
       console.log('solanaWeb3:', solanaWeb3);
       if (!solanaWeb3) {
