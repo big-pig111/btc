@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>猜比特币涨跌</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.93.5/lib/index.iife.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@solana/spl-token@0.3.8/lib/index.iife.min.js"></script>
+  </head>
+  <body class="bg-gradient-to-br from-yellow-100 to-orange-200 flex flex-col items-center justify-center min-h-screen p-4">
+    <div class="absolute top-4 right-6">
+      <button id="connectWalletBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl font-semibold shadow-lg">连接钱包</button>
+      <span id="walletAddress" class="ml-2 text-purple-800 font-mono"></span>
+    </div>
+    <div class="text-center mb-6">
+      <h1 class="text-4xl font-bold text-yellow-800 mb-2 flex items-center justify-center">
+        🪙 猜比特币五分钟后涨跌！
+      </h1>
+      <p class="text-lg text-yellow-700">猜猜五分钟后是涨还是跌，拼一拼你的直觉 🧠</p>
+      <p id="livePrice" class="text-xl font-semibold text-green-800 mt-2">当前 BTC/USD：加载中...</p>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 text-center">
+      <canvas id="btcChart" class="mb-6"></canvas>
+
+      <p id="status" class="text-gray-800 text-xl mb-4">你觉得接下来五分钟比特币是涨还是跌？</p>
+      <div id="buttons" class="flex justify-center gap-4 mb-4">
+        <button onclick="handleGuess('up')" class="bg-green-100 hover:bg-green-200 text-green-800 px-4 py-2 rounded-lg">📈 涨！</button>
+        <button onclick="handleGuess('down')" class="bg-red-100 hover:bg-red-200 text-red-800 px-4 py-2 rounded-lg">📉 跌！</button>
+      </div>
+      <p id="countdown" class="text-xl font-medium text-yellow-800 mb-4 hidden"></p>
+      <div id="resultContainer" class="hidden flex flex-col items-center">
+        <p id="result" class="text-2xl font-semibold text-purple-800 mb-4"></p>
+        <img id="memeImg" class="rounded-xl shadow-md w-64 h-64 object-cover mb-4" />
+        <button onclick="resetGame()" class="bg-yellow-400 hover:bg-yellow-500 text-white px-4 py-2 rounded-xl">再来一局 🔁</button>
+      </div>
+    </div>
+
+    <div id="betModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 hidden">
+      <div class="bg-white rounded-2xl shadow-2xl p-8 w-80 flex flex-col items-center">
+        <h2 class="text-xl font-bold mb-4 text-yellow-800">请输入下注的Bonk代币数量</h2>
+        <input id="betAmount" type="number" min="1" class="border rounded-lg px-3 py-2 w-full mb-4 text-center text-lg" placeholder="Bonk数量" />
+        <div class="flex gap-4 w-full">
+          <button id="cancelBet" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg">取消</button>
+          <button id="confirmBet" class="flex-1 bg-yellow-400 hover:bg-yellow-500 text-white px-4 py-2 rounded-lg">确认</button>
+        </div>
+        <p id="betError" class="text-red-600 mt-3 text-sm"></p>
+      </div>
+    </div>
+
+    <script>
+      let prediction = null;
+      let countdown = 10;
+      let timer;
+      let startPrice = null;
+      let isWaitingForWin = false;
+      let hasRewarded = false;
+      const memes = [
+        "https://i.imgur.com/RsGxZ5V.gif",
+        "https://i.imgur.com/jHVd0QK.gif",
+        "https://i.imgur.com/3jLPB46.gif",
+        "https://i.imgur.com/EV6v4lA.gif"
+      ];
+
+      let priceHistory = [];
+      let chart;
+
+      const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
+
+      ws.onmessage = function(event) {
+        const trade = JSON.parse(event.data);
+        const price = parseFloat(trade.p);
+        const time = new Date().toLocaleTimeString();
+
+        document.getElementById("livePrice").textContent = `当前 BTC/USD：$${price}`;
+        priceHistory.push({ time, price });
+        if (priceHistory.length > 30) priceHistory.shift();
+        updateChart();
+
+        console.log('isWaitingForWin:', isWaitingForWin, 'hasRewarded:', hasRewarded, 'startPrice:', startPrice, 'prediction:', prediction, 'price:', price);
+
+        if (isWaitingForWin && !hasRewarded && startPrice !== null && prediction !== null) {
+          const actual = price > startPrice ? 'up' : 'down';
+          if (actual === prediction) {
+            hasRewarded = true;
+            showWinReward(price);
+          }
+        }
+      };
+
+      function updateChart() {
+        if (!chart) return;
+        chart.data.labels = priceHistory.map(p => p.time);
+        chart.data.datasets[0].data = priceHistory.map(p => p.price);
+        chart.update();
+      }
+
+      function initChart() {
+        const ctx = document.getElementById('btcChart').getContext('2d');
+        chart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: [],
+            datasets: [{
+              label: 'BTC/USD 30秒线',
+              data: [],
+              backgroundColor: 'rgba(255, 206, 86, 0.2)',
+              borderColor: 'rgba(255, 159, 64, 1)',
+              borderWidth: 2,
+              pointRadius: 0,
+              fill: true,
+              tension: 0.3
+            }]
+          },
+          options: {
+            scales: {
+              y: {
+                beginAtZero: false
+              }
+            },
+            plugins: {
+              legend: {
+                display: true
+              }
+            }
+          }
+        });
+      }
+
+      window.onload = initChart;
+
+      async function fetchBTCPrice() {
+        try {
+          const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd");
+          const data = await res.json();
+          return data.bitcoin.usd;
+        } catch (e) {
+          console.error("获取价格失败", e);
+          return null;
+        }
+      }
+
+      // Bonk代币Mint地址
+      const BONK_MINT = 'DezX6B5AqF5rYv3gYQ2Q1rR1Q6Xo8Xz2y1k5Q1Q1Q1Q1';
+      const BET_RECEIVER = '2kvez4gd2wsS5KJNXZ1m3puqo9QuKAKKRKAArwRGcF7Q';
+      let betAmount = 0;
+      let betTxSig = null;
+      // 下注弹窗相关
+      const betModal = document.getElementById('betModal');
+      const betAmountInput = document.getElementById('betAmount');
+      const cancelBetBtn = document.getElementById('cancelBet');
+      const confirmBetBtn = document.getElementById('confirmBet');
+      const betError = document.getElementById('betError');
+      // 拦截按钮，弹出下注弹窗
+      const oldHandleGuess = handleGuess;
+      window.handleGuess = function(guess) {
+        if (!walletAddress) {
+          alert('请先连接钱包');
+          return;
+        }
+        betAmountInput.value = '';
+        betError.textContent = '';
+        betModal.classList.remove('hidden');
+        // 暂存用户选择
+        betModal.dataset.guess = guess;
+      };
+      cancelBetBtn.onclick = () => {
+        betModal.classList.add('hidden');
+      };
+      confirmBetBtn.onclick = async () => {
+        betError.textContent = '';
+        const amount = parseFloat(betAmountInput.value);
+        if (!amount || amount <= 0) {
+          betError.textContent = '请输入有效的数量';
+          return;
+        }
+        if (!walletAddress) {
+          betError.textContent = '请先连接钱包';
+          return;
+        }
+        confirmBetBtn.disabled = true;
+        confirmBetBtn.textContent = '下注中...';
+        try {
+          // 1. 构造SPL Token转账
+          const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), 'confirmed');
+          const fromPubkey = new solanaWeb3.PublicKey(walletAddress);
+          const toPubkey = new solanaWeb3.PublicKey(BET_RECEIVER);
+          const mintPubkey = new solanaWeb3.PublicKey(BONK_MINT);
+          // 获取用户Bonk账户
+          const fromTokenAccounts = await connection.getParsedTokenAccountsByOwner(fromPubkey, { mint: mintPubkey });
+          if (!fromTokenAccounts.value.length) throw new Error('钱包中没有Bonk代币');
+          const fromTokenAccount = fromTokenAccounts.value[0].pubkey;
+          // 获取接收方Bonk账户，没有则自动创建
+          let toTokenAccounts = await connection.getParsedTokenAccountsByOwner(toPubkey, { mint: mintPubkey });
+          let toTokenAccount;
+          if (toTokenAccounts.value.length) {
+            toTokenAccount = toTokenAccounts.value[0].pubkey;
+          } else {
+            // 需要创建ATA
+            toTokenAccount = await solanaSplToken.Token.getAssociatedTokenAddress(
+              solanaSplToken.ASSOCIATED_TOKEN_PROGRAM_ID,
+              solanaSplToken.TOKEN_PROGRAM_ID,
+              mintPubkey,
+              toPubkey
+            );
+          }
+          // Bonk精度为5位
+          const decimals = 5;
+          const realAmount = Math.floor(amount * Math.pow(10, decimals));
+          // 构造转账指令
+          const transaction = new solanaWeb3.Transaction().add(
+            solanaSplToken.Token.createTransferInstruction(
+              solanaSplToken.TOKEN_PROGRAM_ID,
+              fromTokenAccount,
+              toTokenAccount,
+              fromPubkey,
+              [],
+              realAmount
+            )
+          );
+          // 2. 让Phantom签名并发送
+          transaction.feePayer = fromPubkey;
+          transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
+          const signed = await window.solana.signTransaction(transaction);
+          const txid = await connection.sendRawTransaction(signed.serialize());
+          await connection.confirmTransaction(txid, 'confirmed');
+          betTxSig = txid;
+          betAmount = amount;
+          betModal.classList.add('hidden');
+          // 下注成功，允许猜测
+          oldHandleGuess(betModal.dataset.guess);
+        } catch (e) {
+          betError.textContent = '下注失败：' + (e.message || e);
+        } finally {
+          confirmBetBtn.disabled = false;
+          confirmBetBtn.textContent = '确认';
+        }
+      };
+
+      async function handleGuess(guess) {
+        prediction = guess;
+        document.getElementById('buttons').classList.add('hidden');
+        document.getElementById('countdown').classList.remove('hidden');
+        document.getElementById('status').textContent = '正在获取当前比特币价格...';
+
+        startPrice = await fetchBTCPrice();
+
+        if (startPrice === null) {
+          document.getElementById('status').textContent = '价格获取失败，请稍后再试';
+          return;
+        }
+
+        document.getElementById('status').textContent = '倒计时：' + countdown + ' 秒';
+        updateCountdown();
+        timer = setInterval(() => {
+          countdown--;
+          updateCountdown();
+          if (countdown === 0) {
+            clearInterval(timer);
+            showResult();
+          }
+        }, 1000);
+      }
+
+      function updateCountdown() {
+        document.getElementById('status').textContent = '倒计时：' + countdown + ' 秒';
+      }
+
+      async function showResult() {
+        document.getElementById('status').textContent = '倒计时结束，正在等待价格变化...';
+        document.getElementById('countdown').classList.add('hidden');
+        isWaitingForWin = true;
+        hasRewarded = false;
+      }
+
+      async function showWinReward(currentPrice) {
+        document.getElementById('result').textContent = '🎉 猜对啦！';
+        document.getElementById('memeImg').src = getRandomMeme();
+        document.getElementById('resultContainer').classList.remove('hidden');
+        document.getElementById('status').textContent = `起始价格：$${startPrice}，当前价格：$${currentPrice}`;
+        setTimeout(async () => {
+          const address = prompt("恭喜猜对！请输入你的Solana钱包地址领取奖励：");
+          if (address) {
+            try {
+              const resp = await fetch('https://你的后端接口/send-token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ address })
+              });
+              if (resp.ok) {
+                alert('奖励已发放（如未到账请稍等片刻）');
+              } else {
+                alert('发放奖励失败，请稍后重试');
+              }
+            } catch (e) {
+              alert('发放奖励时发生错误，请稍后重试');
+            }
+          }
+        }, 500);
+        isWaitingForWin = false;
+      }
+
+      function resetGame() {
+        prediction = null;
+        countdown = 10;
+        startPrice = null;
+        isWaitingForWin = false;
+        hasRewarded = false;
+        document.getElementById('status').textContent = '你觉得接下来五分钟比特币是涨还是跌？';
+        document.getElementById('buttons').classList.remove('hidden');
+        document.getElementById('resultContainer').classList.add('hidden');
+      }
+
+      // 钱包连接相关
+      let walletAddress = null;
+      const connectWalletBtn = document.getElementById('connectWalletBtn');
+      const walletAddressSpan = document.getElementById('walletAddress');
+
+      async function connectWallet() {
+        if (window.solana && window.solana.isPhantom) {
+          try {
+            const resp = await window.solana.connect();
+            walletAddress = resp.publicKey.toString();
+            connectWalletBtn.textContent = '已连接';
+            walletAddressSpan.textContent = walletAddress.slice(0, 4) + '...' + walletAddress.slice(-4);
+          } catch (err) {
+            alert('钱包连接失败');
+          }
+        } else {
+          alert('请先安装Phantom钱包插件');
+        }
+      }
+      connectWalletBtn.onclick = connectWallet;
+      // 页面加载时检测是否已连接
+      window.addEventListener('load', async () => {
+        if (window.solana && window.solana.isPhantom) {
+          try {
+            const resp = await window.solana.connect({ onlyIfTrusted: true });
+            walletAddress = resp.publicKey.toString();
+            connectWalletBtn.textContent = '已连接';
+            walletAddressSpan.textContent = walletAddress.slice(0, 4) + '...' + walletAddress.slice(-4);
+          } catch {}
+        }
+      });
+    </script>
+  </body>
+</html>
