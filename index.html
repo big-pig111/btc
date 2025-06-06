@@ -51,6 +51,9 @@
     </div>
 
     <script>
+      const solanaWeb3 = window.solanaWeb3 || (window.solana && window.solana.web3);
+      const solanaSplToken = window.solanaSplToken;
+
       let prediction = null;
       let countdown = 10;
       let timer;
