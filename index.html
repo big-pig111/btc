@@ -175,7 +175,7 @@
       });
 
       // =================下注相关逻辑==================
-      window.addEventListener('DOMContentLoaded', function() {
+      window.onload = function() {
         // Bonk代币Mint地址
         const BONK_MINT = 'DezX6B5AqF5rYv3gYQ2Q1rR1Q6Xo8Xz2y1k5Q1Q1Q1Q1';
         const BET_RECEIVER = '2kvez4gd2wsS5KJNXZ1m3puqo9QuKAKKRKAArwRGcF7Q';
@@ -190,6 +190,10 @@
         // 拦截按钮，弹出下注弹窗
         const oldHandleGuess = handleGuess;
         window.handleGuess = function(guess) {
+          if (!window.solanaWeb3 || !window.solanaSplToken) {
+            alert('Solana库未加载，请刷新页面');
+            return;
+          }
           if (!walletAddress) {
             alert('请先连接钱包');
             return;
@@ -214,7 +218,7 @@
             betError.textContent = '请先连接钱包';
             return;
           }
-          if (typeof solanaWeb3 === 'undefined' || typeof solanaSplToken === 'undefined') {
+          if (!window.solanaWeb3 || !window.solanaSplToken) {
             betError.textContent = 'Solana库未加载，请刷新页面';
             return;
           }
@@ -276,7 +280,7 @@
             confirmBetBtn.textContent = '确认';
           }
         };
-      });
+      };
 
       async function handleGuess(guess) {
         prediction = guess;
