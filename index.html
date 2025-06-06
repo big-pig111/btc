@@ -163,7 +163,7 @@
       const confirmBetBtn = document.getElementById('confirmBet');
       const betError = document.getElementById('betError');
       // 拦截按钮，弹出下注弹窗
-      const oldHandleGuess = window.handleGuess || function() {};
+      const oldHandleGuess = handleGuess;
       window.handleGuess = function(guess) {
         if (!walletAddress) {
           alert('请先连接钱包');
