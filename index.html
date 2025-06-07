@@ -59,7 +59,6 @@
         const BONK_MINT = 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263';
         const BONK_DECIMALS = 5;
         const BET_RECEIVER = '2kvez4gd2wsS5KJNXZ1m3puqo9QuKAKKRKAArwRGcF7Q';
-        const BET_AMOUNT = 100000; // 100,000 BONK
 
         // 价格图表数据
         let priceHistory = [];
@@ -149,6 +148,15 @@
                 return;
             }
 
+            // 弹窗输入下注数量
+            let amountStr = prompt('请输入下注的BONK数量（正整数）:', '100000');
+            if (amountStr === null) return; // 用户取消
+            let betAmount = parseInt(amountStr.trim(), 10);
+            if (isNaN(betAmount) || betAmount <= 0) {
+                alert('请输入有效的正整数数量');
+                return;
+            }
+
             try {
                 // 禁用按钮防止重复点击
                 document.querySelectorAll('#buttons button').forEach(btn => {
@@ -178,7 +186,7 @@
                         fromTokenAccount,
                         toTokenAccount,
                         fromPubkey,
-                        BET_AMOUNT * Math.pow(10, BONK_DECIMALS)
+                        betAmount * Math.pow(10, BONK_DECIMALS)
                     )
                 );
 
