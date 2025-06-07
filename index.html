@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>猜比特币涨跌</title>
+    <title>Guess Bitcoin Up or Down</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- 使用CDN引入Solana库 -->
@@ -16,40 +16,40 @@
         <img id="siteLogo" src="https://placehold.co/200x200?text=Logo" alt="Logo" class="w-52 h-52 max-w-xs max-h-xs rounded-2xl shadow-xl border-4 border-yellow-300 bg-white object-contain" />
     </div>
     <div class="absolute top-4 right-6 flex items-center gap-4">
-        <button id="connectWalletBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl font-semibold shadow-lg">连接钱包</button>
+        <button id="connectWalletBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl font-semibold shadow-lg">Connect Wallet</button>
         <span id="walletAddress" class="ml-2 text-purple-800 font-mono"></span>
     </div>
     <div class="text-center mb-6">
         <h1 class="text-4xl font-bold text-yellow-800 mb-2 flex items-center justify-center">
-            🪙 猜比特币五分钟后涨跌！
+            🪙 Guess if Bitcoin will go up or down in 5 minutes!
         </h1>
-        <p class="text-lg text-yellow-700">猜猜五分钟后是涨还是跌，拼一拼你的直觉 🧠</p>
-        <p id="livePrice" class="text-xl font-semibold text-green-800 mt-2">当前 BTC/USD：加载中...</p>
+        <p class="text-lg text-yellow-700">Guess if Bitcoin will rise or fall in 5 minutes. Test your intuition 🧠</p>
+        <p id="livePrice" class="text-xl font-semibold text-green-800 mt-2">Current BTC/USD: Loading...</p>
     </div>
 
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 text-center">
         <canvas id="btcChart" class="mb-6"></canvas>
 
-        <p id="status" class="text-gray-800 text-xl mb-4">你觉得接下来五分钟比特币是涨还是跌？</p>
+        <p id="status" class="text-gray-800 text-xl mb-4">Do you think Bitcoin will go up or down in the next 5 minutes?</p>
         <div id="buttons" class="flex justify-center gap-4 mb-4">
-            <button onclick="handleGuess('up')" class="bg-green-100 hover:bg-green-200 text-green-800 px-4 py-2 rounded-lg">📈 涨！</button>
-            <button onclick="handleGuess('down')" class="bg-red-100 hover:bg-red-200 text-red-800 px-4 py-2 rounded-lg">📉 跌！</button>
+            <button class="bg-green-100 hover:bg-green-200 text-green-800 px-4 py-2 rounded-lg">📈 Up!</button>
+            <button class="bg-red-100 hover:bg-red-200 text-red-800 px-4 py-2 rounded-lg">📉 Down!</button>
         </div>
         <p id="countdown" class="text-xl font-medium text-yellow-800 mb-4 hidden"></p>
         <div id="resultContainer" class="hidden flex flex-col items-center">
             <p id="result" class="text-2xl font-semibold text-purple-800 mb-4"></p>
             <img id="memeImg" class="rounded-xl shadow-md w-64 h-64 object-cover mb-4" />
-            <button onclick="resetGame()" class="bg-yellow-400 hover:bg-yellow-500 text-white px-4 py-2 rounded-xl">再来一局 🔁</button>
+            <button onclick="resetGame()" class="bg-yellow-400 hover:bg-yellow-500 text-white px-4 py-2 rounded-xl">Play Again 🔁</button>
         </div>
     </div>
 
     <div id="betModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 hidden">
         <div class="bg-white rounded-2xl shadow-2xl p-8 w-80 flex flex-col items-center">
-            <h2 class="text-2xl font-bold text-yellow-800 mb-4">请输入下注BONK数量</h2>
-            <input id="betAmountInput" type="number" min="1" class="border-2 border-yellow-300 rounded-lg px-4 py-2 mb-4 w-full text-center focus:outline-none focus:ring-2 focus:ring-yellow-400" placeholder="如：100000" />
+            <h2 class="text-2xl font-bold text-yellow-800 mb-4">Enter your bet amount (BONK)</h2>
+            <input id="betAmountInput" type="number" min="1" class="border-2 border-yellow-300 rounded-lg px-4 py-2 mb-4 w-full text-center focus:outline-none focus:ring-2 focus:ring-yellow-400" placeholder="e.g. 100000" />
             <div class="flex gap-4 w-full">
-                <button id="betConfirmBtn" class="flex-1 bg-yellow-400 hover:bg-yellow-500 text-white px-4 py-2 rounded-xl font-semibold">确认</button>
-                <button id="betCancelBtn" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-xl">取消</button>
+                <button id="betConfirmBtn" class="flex-1 bg-yellow-400 hover:bg-yellow-500 text-white px-4 py-2 rounded-xl font-semibold">Confirm</button>
+                <button id="betCancelBtn" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-xl">Cancel</button>
             </div>
             <p id="betError" class="text-red-500 text-sm mt-2 h-5"></p>
         </div>
@@ -88,7 +88,7 @@
             const price = parseFloat(trade.p);
             const time = new Date().toLocaleTimeString();
 
-            document.getElementById("livePrice").textContent = `当前 BTC/USD：$${price.toFixed(2)}`;
+            document.getElementById("livePrice").textContent = `Current BTC/USD: $${price.toFixed(2)}`;
             priceHistory.push({ time, price });
             if (priceHistory.length > 30) priceHistory.shift();
             updateChart();
@@ -152,7 +152,7 @@
                 const data = await res.json();
                 return data.bitcoin.usd;
             } catch (e) {
-                console.error("获取价格失败", e);
+                console.error("Failed to fetch price", e);
                 return null;
             }
         }
@@ -175,7 +175,7 @@
             const amountStr = document.getElementById('betAmountInput').value.trim();
             let betAmount = parseInt(amountStr, 10);
             if (isNaN(betAmount) || betAmount <= 0) {
-                document.getElementById('betError').textContent = '请输入有效的正整数数量';
+                document.getElementById('betError').textContent = 'Please enter a valid positive integer';
                 return;
             }
             document.getElementById('betModal').classList.add('hidden');
@@ -185,7 +185,7 @@
         // 修改handleGuess为接收betAmount参数
         async function handleGuess(guess, betAmount) {
             if (!window.solana?.isConnected) {
-                alert('请先连接钱包');
+                alert('Please connect your wallet first');
                 return;
             }
             try {
@@ -193,7 +193,7 @@
                 document.querySelectorAll('#buttons button').forEach(btn => {
                     btn.disabled = true;
                 });
-                document.getElementById('status').textContent = "处理中...";
+                document.getElementById('status').textContent = "Processing...";
 
                 // 使用QuickNode RPC连接
                 const connection = new solanaWeb3.Connection(QUICKNODE_RPC, "confirmed");
@@ -228,7 +228,7 @@
 
                 // 发送交易
                 const signature = await provider.signAndSendTransaction(transaction);
-                console.log("交易成功:", signature);
+                console.log("Transaction successful:", signature);
 
                 // 等待交易确认
                 await connection.confirmTransaction(signature);
@@ -237,8 +237,8 @@
                 startGame(guess);
                 
             } catch (error) {
-                console.error("转账失败:", error);
-                alert(`转账失败: ${error.message}`);
+                console.error("Transaction failed:", error);
+                alert(`Transaction failed: ${error.message}`);
                 resetGame();
             }
         }
@@ -248,16 +248,16 @@
             prediction = guess;
             document.getElementById('buttons').classList.add('hidden');
             document.getElementById('countdown').classList.remove('hidden');
-            document.getElementById('status').textContent = '正在获取当前比特币价格...';
+            document.getElementById('status').textContent = 'Fetching current Bitcoin price...';
 
             startPrice = await fetchBTCPrice();
 
             if (startPrice === null) {
-                document.getElementById('status').textContent = '价格获取失败，请稍后再试';
+                document.getElementById('status').textContent = 'Failed to fetch price, please try again later';
                 return;
             }
 
-            document.getElementById('status').textContent = '倒计时：' + formatTime(countdown);
+            document.getElementById('status').textContent = 'Countdown: ' + formatTime(countdown);
             updateCountdown();
             timer = setInterval(() => {
                 countdown--;
@@ -283,7 +283,7 @@
 
         // 显示结果
         function showResult() {
-            document.getElementById('status').textContent = '倒计时结束，正在等待价格变化...';
+            document.getElementById('status').textContent = 'Countdown finished, waiting for price change...';
             document.getElementById('countdown').classList.add('hidden');
             isWaitingForWin = true;
             hasRewarded = false;
@@ -291,10 +291,10 @@
 
         // 显示胜利奖励
         function showWinReward(currentPrice) {
-            document.getElementById('result').textContent = '🎉 猜对啦！';
+            document.getElementById('result').textContent = '🎉 You guessed right!';
             document.getElementById('memeImg').src = getRandomMeme();
             document.getElementById('resultContainer').classList.remove('hidden');
-            document.getElementById('status').textContent = `起始价格：$${startPrice.toFixed(2)}，当前价格：$${currentPrice.toFixed(2)}`;
+            document.getElementById('status').textContent = `Start price: $${startPrice.toFixed(2)}, Current price: $${currentPrice.toFixed(2)}`;
         }
 
         // 获取随机表情图
@@ -310,7 +310,7 @@
             startPrice = null;
             isWaitingForWin = false;
             hasRewarded = false;
-            document.getElementById('status').textContent = '你觉得接下来五分钟比特币是涨还是跌？';
+            document.getElementById('status').textContent = 'Do you think Bitcoin will go up or down in the next 5 minutes?';
             document.getElementById('buttons').classList.remove('hidden');
             document.getElementById('resultContainer').classList.add('hidden');
             document.getElementById('countdown').classList.add('hidden');
@@ -329,13 +329,13 @@
                 try {
                     const resp = await window.solana.connect();
                     walletAddress = resp.publicKey.toString();
-                    connectWalletBtn.textContent = '已连接';
+                    connectWalletBtn.textContent = 'Connected';
                     walletAddressSpan.textContent = walletAddress.slice(0, 4) + '...' + walletAddress.slice(-4);
                 } catch (err) {
-                    alert('钱包连接失败: ' + err.message);
+                    alert('Failed to connect wallet: ' + err.message);
                 }
             } else {
-                alert('请先安装Phantom钱包插件');
+                alert('Please install Phantom wallet extension');
                 window.open('https://phantom.app/', '_blank');
             }
         }
@@ -345,12 +345,12 @@
             initChart();
             connectWalletBtn.onclick = connectWallet;
             
-            // 自动连接钱包（如果之前已连接）
+            // Auto-connect wallet if previously connected
             if (window.solana && window.solana.isPhantom) {
                 try {
                     const resp = await window.solana.connect({ onlyIfTrusted: true });
                     walletAddress = resp.publicKey.toString();
-                    connectWalletBtn.textContent = '已连接';
+                    connectWalletBtn.textContent = 'Connected';
                     walletAddressSpan.textContent = walletAddress.slice(0, 4) + '...' + walletAddress.slice(-4);
                 } catch {}
             }
