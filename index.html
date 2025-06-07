@@ -11,7 +11,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@solana/spl-token@0.3.8/lib/index.iife.min.js"></script>
 </head>
 <body class="bg-gradient-to-br from-yellow-100 to-orange-200 flex flex-col items-center justify-center min-h-screen p-4">
-    <div class="absolute top-4 right-6">
+    <div class="absolute top-4 right-6 flex items-center gap-4">
+        <!-- LOGO 预留位：将 src 替换为你的 logo 图片链接 -->
+        <img id="siteLogo" src="https://placehold.co/48x48?text=Logo" alt="Logo" class="w-12 h-12 rounded-full shadow border border-yellow-300 bg-white object-contain" />
         <button id="connectWalletBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl font-semibold shadow-lg">连接钱包</button>
         <span id="walletAddress" class="ml-2 text-purple-800 font-mono"></span>
     </div>
