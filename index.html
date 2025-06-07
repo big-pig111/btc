@@ -45,7 +45,7 @@
 
     <div id="betModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 hidden">
         <div class="bg-white rounded-2xl shadow-2xl p-8 w-80 flex flex-col items-center">
-            <h2 class="text-2xl font-bold text-yellow-800 mb-4">Enter your bet amount (BONK)</h2>
+            <h2 class="text-2xl font-bold text-yellow-800 mb-4">Enter your bet amount (GUESS)</h2>
             <input id="betAmountInput" type="number" min="1" class="border-2 border-yellow-300 rounded-lg px-4 py-2 mb-4 w-full text-center focus:outline-none focus:ring-2 focus:ring-yellow-400" placeholder="e.g. 100000" />
             <div class="flex gap-4 w-full">
                 <button id="betConfirmBtn" class="flex-1 bg-yellow-400 hover:bg-yellow-500 text-white px-4 py-2 rounded-xl font-semibold">Confirm</button>
@@ -72,8 +72,8 @@
 
         // Solana配置
         const QUICKNODE_RPC = "https://small-holy-forest.solana-mainnet.quiknode.pro/b59315ea187b3de1b3542c5c25d7f2d5b5410ff4/";
-        const BONK_MINT = 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263';
-        const BONK_DECIMALS = 5;
+        const GUESS_MINT = 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263';
+        const GUESS_DECIMALS = 5;
         const BET_RECEIVER = '2kvez4gd2wsS5KJNXZ1m3puqo9QuKAKKRKAArwRGcF7Q';
 
         // 价格图表数据
@@ -202,12 +202,12 @@
                 
                 // 获取发送方和接收方的token账户
                 const fromTokenAccount = await splToken.getAssociatedTokenAddress(
-                    new solanaWeb3.PublicKey(BONK_MINT),
+                    new solanaWeb3.PublicKey(GUESS_MINT),
                     fromPubkey
                 );
                 
                 const toTokenAccount = await splToken.getAssociatedTokenAddress(
-                    new solanaWeb3.PublicKey(BONK_MINT),
+                    new solanaWeb3.PublicKey(GUESS_MINT),
                     new solanaWeb3.PublicKey(BET_RECEIVER)
                 );
 
@@ -217,7 +217,7 @@
                         fromTokenAccount,
                         toTokenAccount,
                         fromPubkey,
-                        betAmount * Math.pow(10, BONK_DECIMALS)
+                        betAmount * Math.pow(10, GUESS_DECIMALS)
                     )
                 );
 
