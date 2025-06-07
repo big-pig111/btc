@@ -39,6 +39,18 @@
         </div>
     </div>
 
+    <div id="betModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 w-80 flex flex-col items-center">
+            <h2 class="text-2xl font-bold text-yellow-800 mb-4">请输入下注BONK数量</h2>
+            <input id="betAmountInput" type="number" min="1" class="border-2 border-yellow-300 rounded-lg px-4 py-2 mb-4 w-full text-center focus:outline-none focus:ring-2 focus:ring-yellow-400" placeholder="如：100000" />
+            <div class="flex gap-4 w-full">
+                <button id="betConfirmBtn" class="flex-1 bg-yellow-400 hover:bg-yellow-500 text-white px-4 py-2 rounded-xl font-semibold">确认</button>
+                <button id="betCancelBtn" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-xl">取消</button>
+            </div>
+            <p id="betError" class="text-red-500 text-sm mt-2 h-5"></p>
+        </div>
+    </div>
+
     <script>
         // 游戏状态变量
         let prediction = null;
@@ -141,22 +153,37 @@
             }
         }
 
-        // 处理用户猜测
-        async function handleGuess(guess) {
+        // 处理用户猜测弹窗
+        let pendingGuess = null;
+        function showBetModal(guess) {
+            pendingGuess = guess;
+            document.getElementById('betAmountInput').value = '';
+            document.getElementById('betError').textContent = '';
+            document.getElementById('betModal').classList.remove('hidden');
+        }
+        document.querySelectorAll('#buttons button').forEach((btn, idx) => {
+            btn.onclick = () => showBetModal(idx === 0 ? 'up' : 'down');
+        });
+        document.getElementById('betCancelBtn').onclick = () => {
+            document.getElementById('betModal').classList.add('hidden');
+        };
+        document.getElementById('betConfirmBtn').onclick = async () => {
+            const amountStr = document.getElementById('betAmountInput').value.trim();
+            let betAmount = parseInt(amountStr, 10);
+            if (isNaN(betAmount) || betAmount <= 0) {
+                document.getElementById('betError').textContent = '请输入有效的正整数数量';
+                return;
+            }
+            document.getElementById('betModal').classList.add('hidden');
+            await handleGuess(pendingGuess, betAmount);
+        };
+
+        // 修改handleGuess为接收betAmount参数
+        async function handleGuess(guess, betAmount) {
             if (!window.solana?.isConnected) {
                 alert('请先连接钱包');
                 return;
             }
-
-            // 弹窗输入下注数量
-            let amountStr = prompt('请输入下注的BONK数量（正整数）:', '100000');
-            if (amountStr === null) return; // 用户取消
-            let betAmount = parseInt(amountStr.trim(), 10);
-            if (isNaN(betAmount) || betAmount <= 0) {
-                alert('请输入有效的正整数数量');
-                return;
-            }
-
             try {
                 // 禁用按钮防止重复点击
                 document.querySelectorAll('#buttons button').forEach(btn => {
